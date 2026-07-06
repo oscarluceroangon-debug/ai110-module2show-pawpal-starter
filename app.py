@@ -1,4 +1,8 @@
+from datetime import date, datetime, time
+
 import streamlit as st
+
+from pawpal_system import Owner, Pet, Scheduler, Task
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -38,51 +42,113 @@ At minimum, your system should:
 
 st.divider()
 
-st.subheader("Quick Demo Inputs (UI only)")
-owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
+st.subheader("Owner & Pets")
 
-st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+# --- Session vault ---------------------------------------------------------
+# Create the Owner and Scheduler ONCE and store them in st.session_state.
+# The guards below check the "vault" first so we reuse the existing objects
+# on every rerun instead of wiping out pets and tasks each interaction.
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(name="Jordan", age=28, address="123 Maple St")
+if "scheduler" not in st.session_state:
+    st.session_state.scheduler = Scheduler()
 
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
+owner = st.session_state.owner
+scheduler = st.session_state.scheduler
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+# Keep the stored owner in sync with the name field.
+owner.name = st.text_input("Owner name", value=owner.name)
 
-if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
+st.markdown("### Add a pet")
+pcol1, pcol2, pcol3 = st.columns(3)
+with pcol1:
+    pet_name = st.text_input("Pet name", value="Mochi")
+with pcol2:
+    species = st.selectbox("Species", ["dog", "cat", "other"])
+with pcol3:
+    pet_age = st.number_input("Age", min_value=0, max_value=40, value=2)
+
+if st.button("Add pet"):
+    if any(p.name == pet_name for p in owner.pets):
+        st.warning(f"{pet_name} is already one of {owner.name}'s pets.")
+    else:
+        owner.add_pet(Pet(name=pet_name, animal_type=species, breed="Unknown", age=int(pet_age)))
+        st.success(f"Added {pet_name} to {owner.name}.")
+
+if owner.pets:
+    st.write(f"**{owner.name}'s pets:**")
+    st.table(
+        [
+            {"name": p.name, "species": p.animal_type, "age": p.age, "tasks": len(p.tasks)}
+            for p in owner.pets
+        ]
     )
-
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
 else:
-    st.info("No tasks yet. Add one above.")
+    st.info("No pets yet. Add one above.")
+
+st.divider()
+
+st.subheader("Add Tasks")
+if not owner.pets:
+    st.info("Add a pet first, then you can assign tasks to it.")
+else:
+    tcol1, tcol2, tcol3, tcol4, tcol5 = st.columns(5)
+    with tcol1:
+        which_pet = st.selectbox("Pet", [p.name for p in owner.pets])
+    with tcol2:
+        task_title = st.text_input("Task title", value="Morning walk")
+    with tcol3:
+        due = st.time_input("Due time", value=time(7, 30))
+    with tcol4:
+        priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+    with tcol5:
+        duration = st.number_input("Minutes", min_value=1, max_value=480, value=15)
+
+    if st.button("Add task"):
+        priority_map = {"low": 1, "medium": 2, "high": 3}
+        target = next(p for p in owner.pets if p.name == which_pet)
+        task = Task(
+            description=task_title,
+            date=date.today(),
+            due_time=due,
+            priority=priority_map[priority],
+            preference=priority,
+            duration_minutes=int(duration),
+        )
+        target.add_task(task)  # persists on the Pet inside the vaulted Owner
+        scheduler.create_schedule(task)
+        st.success(f"Added '{task_title}' for {which_pet}.")
 
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+st.caption("Calls Scheduler.todays_schedule() on the tasks stored this session.")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    today = date.today()
+    now = datetime.now()
+    todays = scheduler.todays_schedule(today)
+    if not todays:
+        st.info("No tasks scheduled for today yet. Add some above.")
+    else:
+        st.write(f"**Today's Schedule ({today:%A, %B %d})**")
+        st.table(
+            [
+                {
+                    "time": f"{t.due_time:%H:%M}–{t.end_time():%H:%M}",
+                    "task": t.description,
+                    "priority": t.preference,
+                    "status": t.status(now),
+                }
+                for t in todays
+            ]
+        )
+
+        conflicts = scheduler.conflicts(today)
+        if conflicts:
+            st.warning("⚠️ Overlapping tasks:")
+            for earlier, later in conflicts:
+                st.write(
+                    f"- **{earlier.description}** (ends {earlier.end_time():%H:%M}) "
+                    f"overlaps **{later.description}** (starts {later.due_time:%H:%M})"
+                )

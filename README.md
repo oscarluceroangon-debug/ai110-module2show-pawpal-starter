@@ -45,7 +45,17 @@ pip install -r requirements.txt
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+=== PawPal+ ===
+Oscar, age 28 — 123 Maple St
 
+Pets:
+Rex (Dog, Labrador, age 4)
+Milo (Cat, Tabby, age 2)
+
+Today's Schedule (Sunday, July 05):
+  07:30  Morning walk  [pending]
+  12:15  Litter box cleaning  [pending]
+  18:00  Dinner  [pending]
 ```
 # e.g.:
 # Daily plan for Biscuit (Golden Retriever):
@@ -72,14 +82,57 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+PawPal+ goes beyond a flat task list with the scheduling logic below. All of it
+lives in `pawpal_system.py` and is covered by `tests/test_pawpal.py`.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.todays_schedule(today)` | Order tasks chronologically |
+| Filtering | `Owner.filter_tasks(completed=..., pet_name=...)` | By completion status and/or pet |
+| Conflict detection | `Scheduler.time_clashes()`, `Scheduler.conflicts(today)`, `Scheduler.clash_warnings()` | Same-time & overlapping tasks |
+| Recurring tasks | `Task.next_occurrence()`, `Scheduler.complete_task(task)` | Daily / weekly repeats |
+
+### Sorting behavior
+
+- **`Scheduler.sort_by_time()`** returns all scheduled tasks ordered by due
+  time, earliest first. It uses a lambda `key` that renders each task's
+  `due_time` as an `"HH:MM"` string; because those are zero-padded,
+  lexicographic ordering matches chronological ordering. It returns a new list
+  and leaves the scheduler's stored order untouched.
+- **`Scheduler.todays_schedule(today)`** filters to a single day and sorts by
+  due time, then by priority (higher first) as a tiebreaker.
+
+### Filtering behavior
+
+- **`Owner.filter_tasks(completed=..., pet_name=...)`** returns tasks across all
+  of the owner's pets, narrowed by the criteria you pass. Use `completed=True`
+  or `completed=False` to keep only done or pending tasks, and `pet_name` to
+  keep only one pet's tasks. Either criterion left as `None` is ignored, so
+  calling it with no arguments returns every task.
+
+### Conflict detection logic
+
+- **`Scheduler.time_clashes()`** groups scheduled tasks by `(date, due_time)` and
+  returns any group with two or more tasks — i.e. tasks booked for the exact
+  same moment, whether they belong to the same pet or different pets. Runs in a
+  single `O(n)` pass.
+- **`Scheduler.conflicts(today)`** catches *overlapping* tasks on a given day: it
+  pairs consecutive tasks and flags any where the earlier task is still running
+  (its `Task.end_time()`, derived from `duration_minutes`) when the next is due.
+- **`Scheduler.clash_warnings()`** is a lightweight wrapper that turns each
+  same-time clash into a readable warning string and never raises — on any
+  unexpected error it returns an explanatory warning instead of crashing, so a
+  UI or the CLI can print the result directly.
+
+### Recurring task logic
+
+- Each `Task` carries a `recurrence` field (`"none"`, `"daily"`, or `"weekly"`).
+- **`Task.next_occurrence()`** builds a fresh, incomplete copy of a recurring
+  task with the date advanced by one day or one week (all other fields
+  preserved), or returns `None` for a one-off task.
+- **`Scheduler.complete_task(task)`** marks a task complete and, if it recurs,
+  automatically creates its next occurrence via `next_occurrence()` and
+  registers it on the scheduler so it appears in future schedules.
 
 ## 📸 Demo Walkthrough
 
