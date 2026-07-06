@@ -1,12 +1,18 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
+#Read from here
+ Some required core actions that this app should have is adding a pet, scheduling a walk, seeing what today's tasks.
+ There should be four classes Owner, Pet, Task, Scheduler. Each class would hold different information. Owner: Owners's name, their pet/s, their address, and their age. Pets: Type of animal,Name, breed, pet's age, task and .Task: description, date, due time, and completion status. Scheduler: time, priority,perference. 
 
+ Some methods for Owner would be displaying their pets, and also displaying their info: address,name,age. Some methodes for Pet would be adding pet, removing pet and displaying their name,age,breed, and type of animal. Some methods for Task would be seeing the description, and date for the task. Additional, another method would be showing if a task is complete. Some method for scheduler would be making or cancling a scheduler
+ #Stop here
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+The UML initial design had it so the owner could add pets, pet's info, and their info.Additionally, tbey also had a scheduler amd task maker that showed them the task they have to do or if they wanted to create a new task.
 - What classes did you include, and what responsibilities did you assign to each?
-
+I created four classes: Owner, Pet, Task, Scheduler. Owner had the responsibilitiy of having the pets, and their info. Pet had the responsibilitiy of showing their info: age,name,breed, type of animal, and owner. Task has the responsibilitiy of showing which task need to be compeleted, the date of task, and the description. Scheduler had the task of selecting the time, priority and perference.
 **b. Design changes**
 
 - Did your design change during implementation?

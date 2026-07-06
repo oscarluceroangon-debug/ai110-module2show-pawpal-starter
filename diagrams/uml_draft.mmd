@@ -6,6 +6,9 @@ classDiagram
         +int age
         +String address
         +List~Pet~ pets
+        +addPet(Pet pet) void
+        +removePet(Pet pet) void
+        +allTasks() List~Task~
         +displayPets() void
         +displayInfo() void
     }
@@ -16,8 +19,8 @@ classDiagram
         +String breed
         +int age
         +List~Task~ tasks
-        +addPet(Pet pet) void
-        +removePet(Pet pet) void
+        +addTask(Task task) void
+        +removeTask(Task task) void
         +displayInfo() void
     }
 
@@ -26,15 +29,15 @@ classDiagram
         +Date date
         +Time dueTime
         +boolean isComplete
+        +int priority
+        +String preference
         +getDescription() String
         +getDate() Date
         +checkComplete() boolean
     }
 
     class Scheduler {
-        +Time time
-        +int priority
-        +String preference
+        +List~Task~ scheduledTasks
         +createSchedule(Task task) void
         +cancelSchedule(Task task) void
     }
