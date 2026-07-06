@@ -180,3 +180,146 @@ def test_conflicts_detects_overlap():
 
     conflicts = scheduler.conflicts(day)
     assert conflicts == [(walk, vet)]
+
+
+# --------------------------------------------------------------------------- #
+# Edge cases                                                                   #
+# --------------------------------------------------------------------------- #
+
+
+def test_sort_by_time_interleaves_across_dates():
+    """sort_by_time() orders purely by clock time, ignoring the date."""
+    scheduler = Scheduler()
+    tomorrow_early = Task("Tomorrow walk", date(2026, 7, 6), time(7, 30))
+    today_late = Task("Today dinner", date(2026, 7, 5), time(18, 0))
+    scheduler.create_schedule(today_late)
+    scheduler.create_schedule(tomorrow_early)
+
+    # Tomorrow's 7:30 sorts before today's 18:00 despite being a later date.
+    assert scheduler.sort_by_time() == [tomorrow_early, today_late]
+
+
+def test_sort_by_time_is_stable_for_equal_times():
+    """Tasks sharing a due time keep their insertion order (stable sort)."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    first = Task("First", day, time(7, 30))
+    second = Task("Second", day, time(7, 30))
+    scheduler.create_schedule(first)
+    scheduler.create_schedule(second)
+
+    assert scheduler.sort_by_time() == [first, second]
+
+
+def test_sort_by_time_does_not_mutate_schedule():
+    """sort_by_time() returns a new list and leaves scheduled_tasks untouched."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    dinner = Task("Dinner", day, time(18, 0))
+    walk = Task("Walk", day, time(7, 30))
+    scheduler.create_schedule(dinner)
+    scheduler.create_schedule(walk)
+
+    result = scheduler.sort_by_time()
+
+    assert result == [walk, dinner]
+    assert scheduler.scheduled_tasks == [dinner, walk]  # original order preserved
+
+
+def test_sort_by_time_empty_schedule():
+    """An empty scheduler sorts to an empty list without error."""
+    assert Scheduler().sort_by_time() == []
+
+
+def test_todays_schedule_breaks_ties_by_priority():
+    """Same due time -> higher priority first; other days are excluded."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    low = Task("Low", day, time(7, 30), priority=1)
+    high = Task("High", day, time(7, 30), priority=5)
+    other_day = Task("Other", date(2026, 7, 6), time(6, 0))
+    scheduler.create_schedule(low)
+    scheduler.create_schedule(high)
+    scheduler.create_schedule(other_day)
+
+    assert scheduler.todays_schedule(day) == [high, low]
+
+
+def test_next_occurrence_preserves_fields():
+    """next_occurrence() advances only date/completion, preserving everything else."""
+    task = Task(
+        "Walk",
+        date(2026, 7, 5),
+        time(7, 30),
+        is_complete=True,
+        priority=3,
+        preference="morning",
+        duration_minutes=45,
+        recurrence="daily",
+    )
+    nxt = task.next_occurrence()
+
+    assert nxt is not None
+    assert nxt.date == date(2026, 7, 6)
+    assert nxt.is_complete is False
+    assert nxt.priority == 3
+    assert nxt.preference == "morning"
+    assert nxt.duration_minutes == 45
+    assert nxt.recurrence == "daily"
+    assert nxt.due_time == time(7, 30)
+
+
+def test_next_occurrence_none_for_one_off():
+    """A non-recurring task yields no next occurrence."""
+    assert Task("Vet", date(2026, 7, 5), time(9, 0)).next_occurrence() is None
+
+
+def test_next_occurrence_unknown_recurrence_is_none():
+    """An unrecognized recurrence value is treated as non-recurring (returns None)."""
+    # Note the silent behavior: a mis-cased "Daily" does NOT recur.
+    assert Task("X", date(2026, 7, 5), time(9, 0), recurrence="Daily").next_occurrence() is None
+    assert Task("X", date(2026, 7, 5), time(9, 0), recurrence="monthly").next_occurrence() is None
+
+
+def test_create_schedule_skips_equal_duplicates():
+    """create_schedule() drops a task equal (by value) to one already scheduled."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    scheduler.create_schedule(Task("Walk", day, time(7, 30)))
+    scheduler.create_schedule(Task("Walk", day, time(7, 30)))  # value-equal duplicate
+
+    assert len(scheduler.scheduled_tasks) == 1
+
+
+def test_conflicts_empty_and_single_task():
+    """Zero or one task on a day can never conflict."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    assert scheduler.conflicts(day) == []
+    scheduler.create_schedule(Task("Walk", day, time(7, 30)))
+    assert scheduler.conflicts(day) == []
+
+
+def test_conflicts_detects_overlap_across_midnight():
+    """A task running past midnight should still conflict with a task before it."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    late = Task("Late walk", day, time(23, 50), duration_minutes=30)  # ends 00:20 next day
+    snack = Task("Night snack", day, time(23, 55), duration_minutes=5)
+    scheduler.create_schedule(late)
+    scheduler.create_schedule(snack)
+
+    assert scheduler.conflicts(day) == [(late, snack)]
+
+
+def test_conflicts_detects_non_adjacent_overlap():
+    """A long task should conflict with a task two slots later, not just the next one."""
+    day = date(2026, 7, 5)
+    scheduler = Scheduler()
+    long_task = Task("Long", day, time(9, 0), duration_minutes=120)  # ends 11:00
+    short = Task("Short", day, time(9, 5), duration_minutes=5)  # ends 09:10
+    late = Task("Late", day, time(10, 0), duration_minutes=10)  # starts inside Long
+    for t in (long_task, short, late):
+        scheduler.create_schedule(t)
+
+    assert (long_task, late) in scheduler.conflicts(day)

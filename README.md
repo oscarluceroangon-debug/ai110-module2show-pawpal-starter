@@ -66,18 +66,40 @@ Today's Schedule (Sunday, July 05):
 
 ## 🧪 Testing PawPal+
 
-```bash
-# Run the full test suite:
-pytest
+Run the full test suite from the project root:
 
-# Run with coverage:
-pytest --cov
+```bash
+python -m pytest
 ```
+
+The tests live in `tests/test_pawpal.py` and exercise the core scheduling
+logic in `pawpal_system.py`:
+
+- **Sorting** — `sort_by_time()` returns tasks in chronological order
+  (earliest first), interleaves tasks across different dates purely by clock
+  time, is stable for equal times, and leaves the stored schedule unchanged;
+  `todays_schedule()` filters to one day and breaks ties by priority.
+- **Recurrence** — completing a daily or weekly task auto-schedules its next
+  occurrence (next day / next week) as a fresh, incomplete copy with all other
+  fields preserved; one-off and unrecognized recurrence values spawn nothing.
+- **Conflict detection** — `time_clashes()` flags tasks booked for the exact
+  same date and time (across any pet), and `conflicts()` flags *overlapping*
+  tasks — including overlaps between non-adjacent tasks and overlaps that cross
+  midnight.
+- **Filtering & tasks** — `filter_tasks()` narrows by completion status and/or
+  pet, plus basic task behavior (completion, duration/end time, and status
+  reporting: pending / overdue / done).
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+$ python -m pytest
+============================= test session starts =============================
+collected 25 items
+
+tests/test_pawpal.py ......................... [100%]
+
+============================= 25 passed in 0.05s ==============================
 ```
 
 ## 📐 Smarter Scheduling
@@ -87,51 +109,51 @@ lives in `pawpal_system.py` and is covered by `tests/test_pawpal.py`.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.todays_schedule(today)` | Order tasks chronologically |
-| Filtering | `Owner.filter_tasks(completed=..., pet_name=...)` | By completion status and/or pet |
-| Conflict detection | `Scheduler.time_clashes()`, `Scheduler.conflicts(today)`, `Scheduler.clash_warnings()` | Same-time & overlapping tasks |
-| Recurring tasks | `Task.next_occurrence()`, `Scheduler.complete_task(task)` | Daily / weekly repeats |
+| Task sorting | Scheduler.sort_by_time(),Scheduler.todays_schedule(today)| Order tasks chronologically |
+| Filtering | Owner.filter_tasks(completed=, pet_name=) | By completion status and/or pet |
+| Conflict detection | Scheduler.time_clashes(), Scheduler.conflicts(today), Scheduler.clash_warnings()` | Same-time & overlapping tasks |
+| Recurring tasks | Task.next_occurrence(), Scheduler.complete_task(task) | Daily / weekly repeats |
 
 ### Sorting behavior
 
-- **`Scheduler.sort_by_time()`** returns all scheduled tasks ordered by due
-  time, earliest first. It uses a lambda `key` that renders each task's
-  `due_time` as an `"HH:MM"` string; because those are zero-padded,
+- **Scheduler.sort_by_time()** returns all scheduled tasks ordered by due
+  time, earliest first. It uses a lambda key that renders each task's
+  due_time as an "HH:MM" string; because those are zero-padded,
   lexicographic ordering matches chronological ordering. It returns a new list
   and leaves the scheduler's stored order untouched.
-- **`Scheduler.todays_schedule(today)`** filters to a single day and sorts by
+- **Scheduler.todays_schedule(today)** filters to a single day and sorts by
   due time, then by priority (higher first) as a tiebreaker.
 
 ### Filtering behavior
 
-- **`Owner.filter_tasks(completed=..., pet_name=...)`** returns tasks across all
-  of the owner's pets, narrowed by the criteria you pass. Use `completed=True`
-  or `completed=False` to keep only done or pending tasks, and `pet_name` to
-  keep only one pet's tasks. Either criterion left as `None` is ignored, so
+- **Owner.filter_tasks(completed=, pet_name=)** returns tasks across all
+  of the owner's pets, narrowed by the criteria you pass. Use completed=True
+  or completed=False to keep only done or pending tasks, and pet_name to
+  keep only one pet's tasks. Either criterion left as None is ignored, so
   calling it with no arguments returns every task.
 
 ### Conflict detection logic
 
-- **`Scheduler.time_clashes()`** groups scheduled tasks by `(date, due_time)` and
+- **Scheduler.time_clashes()** groups scheduled tasks by (date, due_time) and
   returns any group with two or more tasks — i.e. tasks booked for the exact
   same moment, whether they belong to the same pet or different pets. Runs in a
-  single `O(n)` pass.
-- **`Scheduler.conflicts(today)`** catches *overlapping* tasks on a given day: it
+  single O(n) pass.
+- **Scheduler.conflicts(today)** catches *overlapping* tasks on a given day: it
   pairs consecutive tasks and flags any where the earlier task is still running
-  (its `Task.end_time()`, derived from `duration_minutes`) when the next is due.
-- **`Scheduler.clash_warnings()`** is a lightweight wrapper that turns each
+  (its Task.end_time(), derived from duration_minutes) when the next is due.
+- **Scheduler.clash_warnings()** is a lightweight wrapper that turns each
   same-time clash into a readable warning string and never raises — on any
   unexpected error it returns an explanatory warning instead of crashing, so a
   UI or the CLI can print the result directly.
 
 ### Recurring task logic
 
-- Each `Task` carries a `recurrence` field (`"none"`, `"daily"`, or `"weekly"`).
-- **`Task.next_occurrence()`** builds a fresh, incomplete copy of a recurring
+- Each Task carries a recurrence field ("none", "daily", or "weekly").
+- **Task.next_occurrence()** builds a fresh, incomplete copy of a recurring
   task with the date advanced by one day or one week (all other fields
-  preserved), or returns `None` for a one-off task.
-- **`Scheduler.complete_task(task)`** marks a task complete and, if it recurs,
-  automatically creates its next occurrence via `next_occurrence()` and
+  preserved), or returns None for a one-off task.
+- **Scheduler.complete_task(task)** marks a task complete and, if it recurs,
+  automatically creates its next occurrence via next_occurrence() and
   registers it on the scheduler so it appears in future schedules.
 
 ## 📸 Demo Walkthrough

@@ -39,10 +39,24 @@ class Task:
         """Mark this task as completed."""
         self.is_complete = True
 
-    def end_time(self) -> time:
-        """Return the clock time this task is expected to finish."""
+    def end_datetime(self) -> datetime:
+        """Return the full date+time this task is expected to finish.
+
+        Unlike :meth:`end_time`, this keeps the date, so a task whose duration
+        pushes it past midnight reports the following day. Use this for any
+        overlap arithmetic; comparing bare clock times would wrap around
+        midnight and hide genuine conflicts.
+        """
         start = datetime.combine(self.date, self.due_time)
-        return (start + timedelta(minutes=self.duration_minutes)).time()
+        return start + timedelta(minutes=self.duration_minutes)
+
+    def end_time(self) -> time:
+        """Return the clock time this task is expected to finish.
+
+        This is a display helper only: it drops the date, so it wraps at
+        midnight. For conflict detection use :meth:`end_datetime` instead.
+        """
+        return self.end_datetime().time()
 
     def status(self, now: datetime) -> str:
         """Return 'done', 'overdue', or 'pending' relative to now."""
@@ -197,16 +211,21 @@ class Scheduler:
         return sorted(due_today, key=lambda t: (t.due_time, -t.priority))
 
     def conflicts(self, today: date) -> list[tuple[Task, Task]]:
-        """Pairs of consecutive tasks today whose times overlap.
+        """Pairs of tasks today whose times overlap.
 
         Two tasks conflict when the earlier one is still running (its
-        end_time) after the later one is due to start.
+        end_datetime) after the later one is due to start. Every task is
+        compared against all later tasks, not just the next one, so a long
+        task that overlaps a task two or more slots away is still caught.
+        Full datetimes are compared so overlaps that cross midnight are not
+        lost to clock-time wraparound.
         """
         tasks = self.todays_schedule(today)
         return [
             (earlier, later)
-            for earlier, later in zip(tasks, tasks[1:])
-            if earlier.end_time() > later.due_time
+            for i, earlier in enumerate(tasks)
+            for later in tasks[i + 1:]
+            if earlier.end_datetime() > datetime.combine(later.date, later.due_time)
         ]
 
     def time_clashes(self) -> list[list[Task]]:
