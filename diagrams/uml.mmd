@@ -1,44 +1,63 @@
 classDiagram
-    %% PawPal+ class diagram based on brainstormed design (see reflection.md)
+    %% PawPal+ class diagram — updated to match the final implementation in pawpal_system.py
 
     class Owner {
-        +String name
+        +str name
         +int age
-        +String address
+        +str address
         +List~Pet~ pets
-        +displayPets() void
-        +displayInfo() void
+        +add_pet(Pet pet) void
+        +remove_pet(Pet pet) void
+        +all_tasks() List~Task~
+        +filter_tasks(bool completed, str pet_name) List~Task~
+        +display_pets() void
+        +display_info() void
     }
 
     class Pet {
-        +String name
-        +String animalType
-        +String breed
+        +str name
+        +str animal_type
+        +str breed
         +int age
         +List~Task~ tasks
-        +addPet(Pet pet) void
-        +removePet(Pet pet) void
-        +displayInfo() void
+        +add_task(Task task) void
+        +remove_task(Task task) void
+        +display_info() void
     }
 
     class Task {
-        +String description
-        +Date date
-        +Time dueTime
-        +boolean isComplete
-        +getDescription() String
-        +getDate() Date
-        +checkComplete() boolean
+        +str description
+        +date date
+        +time due_time
+        +bool is_complete
+        +int priority
+        +str preference
+        +int duration_minutes
+        +str recurrence
+        +get_description() str
+        +get_date() date
+        +check_complete() bool
+        +mark_complete() void
+        +end_time() time
+        +end_datetime() datetime
+        +status(datetime now) str
+        +next_occurrence() Task
     }
 
     class Scheduler {
-        +Time time
-        +int priority
-        +String preference
-        +createSchedule(Task task) void
-        +cancelSchedule(Task task) void
+        +List~Task~ scheduled_tasks
+        +create_schedule(Task task) void
+        +cancel_schedule(Task task) void
+        +complete_task(Task task) Task
+        +sort_by_time() List~Task~
+        +todays_schedule(date today) List~Task~
+        +conflicts(date today) List
+        +time_clashes() List
+        +clash_warnings() List~str~
     }
 
     Owner "1" --> "*" Pet : owns
     Pet "1" --> "*" Task : has
     Scheduler "1" --> "*" Task : schedules
+    Scheduler ..> Task : creates next occurrence
+    Task ..> Task : next_occurrence

@@ -72,21 +72,21 @@ Run the full test suite from the project root:
 python -m pytest
 ```
 
-The tests live in `tests/test_pawpal.py` and exercise the core scheduling
-logic in `pawpal_system.py`:
+The tests live in tests/test_pawpal.py and exercise the core scheduling
+logic in pawpal_system.py:
 
-- **Sorting** — `sort_by_time()` returns tasks in chronological order
+- **Sorting** — sort_by_time() returns tasks in chronological order
   (earliest first), interleaves tasks across different dates purely by clock
   time, is stable for equal times, and leaves the stored schedule unchanged;
-  `todays_schedule()` filters to one day and breaks ties by priority.
+  todays_schedule() filters to one day and breaks ties by priority.
 - **Recurrence** — completing a daily or weekly task auto-schedules its next
   occurrence (next day / next week) as a fresh, incomplete copy with all other
   fields preserved; one-off and unrecognized recurrence values spawn nothing.
-- **Conflict detection** — `time_clashes()` flags tasks booked for the exact
-  same date and time (across any pet), and `conflicts()` flags *overlapping*
+- **Conflict detection** — time_clashes() flags tasks booked for the exact
+  same date and time (across any pet), and conflicts() flags *overlapping*
   tasks — including overlaps between non-adjacent tasks and overlaps that cross
   midnight.
-- **Filtering & tasks** — `filter_tasks()` narrows by completion status and/or
+- **Filtering & tasks** — filter_tasks() narrows by completion status and/or
   pet, plus basic task behavior (completion, duration/end time, and status
   reporting: pending / overdue / done).
 
@@ -95,13 +95,16 @@ Sample test output:
 ```
 $ python -m pytest
 ============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\Oscar\ai110-module2show-pawpal-starter
 collected 25 items
 
-tests/test_pawpal.py ......................... [100%]
+tests\test_pawpal.py ......................... [100%]
 
-============================= 25 passed in 0.05s ==============================
+============================= 25 passed in 0.06s ==============================
 ```
-
+## Confidence Level
+  4 stars
 ## 📐 Smarter Scheduling
 
 PawPal+ goes beyond a flat task list with the scheduling logic below. All of it
@@ -158,12 +161,87 @@ lives in `pawpal_system.py` and is covered by `tests/test_pawpal.py`.
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+PawPal+ runs two ways: an interactive **Streamlit app** (app.py) and a scripted
+**CLI demo** (main.py). Both are backed by the same classes in pawpal_system.py.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+### Before you start
+
+1. Make sure setup is done (see [Getting started → Setup](#setup)) and your virtual
+   environment is active — you should see (.venv) in your prompt.
+2. Open a terminal in the project root (the folder containing app.py and main.py).
+3. Pick how you want to run it:
+   - **Interactive web app:** python -m streamlit run app.py — opens PawPal+ in your
+     browser. Follow the *Example workflow* below.
+   - **Scripted CLI demo:** python main.py — prints the sample run shown at the bottom
+     of this section, no browser needed.
+
+### Main UI features (Streamlit)
+
+Launch it with python -m streamlit run app.py. From top to bottom the app lets a user:
+
+- **Set the owner** — edit the owner's name inline.
+- **Add pets** — enter a name, species, and age; duplicate names are rejected with an
+  st.warning, and current pets (with a per-pet task count) show in a table.
+- **Add tasks** — pick a pet, then set a title, due time, priority (low/medium/high),
+  and duration in minutes. Each task is attached to the pet *and* registered with the
+  Scheduler.
+- **Build the schedule** — generate today's plan and see conflict feedback.
+- **Browse all tasks** — filter by pet and/or completion status, always shown in
+  chronological order.
+
+### Example workflow
+
+1. **Add a pet** — type Rex, species dog, age 4, and click **Add pet**
+   (st.success confirms it).
+2. **Add tasks** — for Rex add Morning walk at 07:30, then Dinner at 18:00;
+   switch to another pet and add Breakfast at 07:30 to create a deliberate clash.
+3. **View today's schedule** — click **Generate schedule**. Tasks appear ordered by
+   time, and because two tasks share 07:30 the app raises a same-time clash warning.
+4. **Filter** — in **All Tasks**, choose a pet or the *Pending* status to narrow the
+   table; the rows stay sorted by clock time.
+
+### Key Scheduler behaviors shown
+
+- **Sorting** — Scheduler.sort_by_time() orders every task chronologically (the demo
+  adds tasks out of order on purpose), and todays_schedule() breaks ties by priority.
+- **Filtering** — Owner.filter_tasks(completed=, pet_name=) powers the pending/done
+  and per-pet views.
+- **Conflict warnings** — Scheduler.clash_warnings() turns same-time bookings into
+  readable warnings (never raising); Scheduler.conflicts() flags overlapping tasks
+  whose durations collide, including non-adjacent and cross-midnight overlaps.
+- **Recurrence** — Scheduler.complete_task() marks a task done and auto-schedules its
+  next daily/weekly occurrence.
+
+### Sample CLI output (python main.py)
+
+```
+=== PawPal+ ===
+Oscar, age 28 — 123 Maple St
+
+Pets:
+Rex (Dog, Labrador, age 4)
+Milo (Cat, Tabby, age 2)
+
+All tasks sorted by time (Scheduler.sort_by_time()):
+  07:30  Morning walk  [pending]
+  07:30  Breakfast  [pending]
+  12:15  Litter box cleaning  [pending]
+  18:00  Dinner  [done]
+
+Still to do today (3 pending):
+  07:30  Morning walk
+  12:15  Litter box cleaning
+  07:30  Breakfast
+
+Already done (1):
+  18:00  Dinner
+
+Rex's tasks only:
+  18:00  Dinner
+  07:30  Morning walk
+
+Conflict check:
+  WARNING: 2 tasks at the same time (Jul 06 07:30): Morning walk, Breakfast
+```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->

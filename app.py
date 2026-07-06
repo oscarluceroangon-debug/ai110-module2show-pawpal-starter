@@ -122,7 +122,7 @@ else:
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("Calls Scheduler.todays_schedule() on the tasks stored this session.")
+st.caption("Calls Scheduler.todays_schedule(), then flags clashes and overlaps.")
 
 if st.button("Generate schedule"):
     today = date.today()
@@ -144,7 +144,15 @@ if st.button("Generate schedule"):
             ]
         )
 
+        # Same-time clashes: Scheduler.clash_warnings() returns ready-to-print
+        # strings and never raises, so it's safe to loop over directly.
+        clash_warnings = scheduler.clash_warnings()
+        # Overlapping (but not identical-time) tasks on this day.
         conflicts = scheduler.conflicts(today)
+
+        for warning in clash_warnings:
+            st.warning(warning)
+
         if conflicts:
             st.warning("⚠️ Overlapping tasks:")
             for earlier, later in conflicts:
@@ -152,3 +160,47 @@ if st.button("Generate schedule"):
                     f"- **{earlier.description}** (ends {earlier.end_time():%H:%M}) "
                     f"overlaps **{later.description}** (starts {later.due_time:%H:%M})"
                 )
+
+        if not clash_warnings and not conflicts:
+            st.success("✅ No scheduling conflicts — you're all set!")
+
+st.divider()
+
+st.subheader("All Tasks")
+st.caption("Ordered by Scheduler.sort_by_time(); narrowed with Owner.filter_tasks().")
+
+if not owner.all_tasks():
+    st.info("No tasks yet. Add some above to see them here.")
+else:
+    fcol1, fcol2 = st.columns(2)
+    with fcol1:
+        pet_choice = st.selectbox("Filter by pet", ["All pets"] + [p.name for p in owner.pets])
+    with fcol2:
+        status_choice = st.selectbox("Filter by status", ["All", "Completed", "Pending"])
+
+    pet_name = None if pet_choice == "All pets" else pet_choice
+    completed = {"All": None, "Completed": True, "Pending": False}[status_choice]
+
+    # Filter with the Owner, then order the survivors by the Scheduler's sort.
+    keep = {id(t) for t in owner.filter_tasks(completed=completed, pet_name=pet_name)}
+    rows = [t for t in scheduler.sort_by_time() if id(t) in keep]
+
+    # Map each task back to its pet so the table can show ownership.
+    task_pet = {id(task): pet.name for pet in owner.pets for task in pet.tasks}
+
+    if not rows:
+        st.info("No tasks match the selected filters.")
+    else:
+        st.caption(f"Showing {len(rows)} of {len(owner.all_tasks())} task(s).")
+        st.table(
+            [
+                {
+                    "time": f"{t.due_time:%H:%M}",
+                    "task": t.description,
+                    "pet": task_pet.get(id(t), "—"),
+                    "priority": t.preference or "—",
+                    "done": "✅" if t.is_complete else "",
+                }
+                for t in rows
+            ]
+        )
